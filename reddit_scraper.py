@@ -18,53 +18,74 @@ colors['yellow'] = '\033[93m'
 def printC(color, text):
     print(color + '{}\033[00m'.format(text))
 
+# DISPLAY
+def displaySubreddit(subreddit, content):
+    index = 1
+    banner = f'==================================== r/{subreddit} ===================================='
+    printC(colors['purple'], banner)
+    print()
 
-# DISPLAY POST
-def displayPost(index, subreddit, title, href, upvotes):
-    print(str(index) + '\t/r/' + subreddit)
+    for elem in content:
+        title = elem.find('p', class_='title')
+        link = elem.find('li', class_='first')
+        if link == None or title == None:
+            pass
+        else:
+            title = title.find('a')
+            href = title['href']
+            if href[0] == '/':
+                href = 'https://www.reddit.com' + href
+            upvotes = elem.find('div', class_='midcol unvoted')
+            upvotes = upvotes.find('div', class_='score unvoted')
+
+            displayPost(index, subreddit, title.text, href, link.a['href'], upvotes.text, link.a.text)
+            index += 1
+
+
+def displayPost(index, subreddit, title, href, reddit_link, upvotes, comments):
+    divider = '--------- ' + str(index) + '    /r/' + subreddit + ' ---------'
+    print(divider)
     printC(colors['cyan'], title)
+    print()
     printC(colors['yellow'], href)
-    print('↑ ' + upvotes + ' ↓')
-    #printC(colors['red'], '↑ ' + upvotes + ' ↓')
+    printC(colors['orange'], reddit_link)
+    print('↑ ' + upvotes + ' ↓\t\t\t' + comments)
+    print(len(divider) * '-')
+    print('\n')
 
 
 # REQUEST
-url = 'https://old.reddit.com/r/' + sys.argv[1]
+def makeRequest(url):
+    page = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/91.0.2'})
+    infile = urllib.request.urlopen(page).read()
+    soup = bs4.BeautifulSoup(infile, "html.parser")
+    return soup 
 
-page = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/91.0.2'})
-infile = urllib.request.urlopen(page).read()
-#data = infile.decode('ISO-8859-1')
-soup = bs4.BeautifulSoup(infile, "html.parser")
+# PARSE SUBREDDIT
+def parseSubreddit(subreddit):
+    url = 'https://old.reddit.com/r/' + subreddit
+    soup = makeRequest(url)
+    soup = soup.find('div', class_='content')
+    siteTable = soup.find(id='siteTable')
+    tableContent = list(siteTable.children)
+    content = collectContent(tableContent)
+    return content
 
-soup = soup.find('div', class_='content')
-siteTable = soup.find(id='siteTable')
-tableContent = list(siteTable.children)
-content = []
 
-# TODO: produce html
+def collectContent(tableContent):
+    content = []
+    for i in range(0, len(tableContent)):
+        elem = tableContent[i]
+        if elem['class'][0] == 'clearleft':
+            pass
+        else:
+            isAd = elem.find(class_='promoted-tag')
+            if isAd == None:
+                content.append(elem)
 
-# collect content
-for i in range(0, len(tableContent)):
-    elem = tableContent[i]
-    if elem['class'][0] == 'clearleft':
-        pass
-    else:
-        isAd = elem.find(class_='promoted-tag')
-        if isAd == None:
-            content.append(elem)
+    return content
 
-index = 1
-for elem in content:
-    title = elem.find('p', class_='title')
-    if title != None:
-        title = title.find('a')
-        href = title['href']
-        if href[0] == '/':
-            href = 'https://www.reddit.com' + href
-        upvotes = elem.find('div', class_='midcol unvoted')
-        upvotes = upvotes.find('div', class_='score unvoted')
-
-        displayPost(index, sys.argv[1], title.text, href, upvotes.text)
-        index += 1
-        print()
-        print()
+subreddits = sys.argv[1:]
+for subreddit in subreddits:
+    content = parseSubreddit(subreddit)
+    displaySubreddit(subreddit, content)
